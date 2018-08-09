@@ -68,40 +68,74 @@ function getWattCost(obj, from, to, value) {
  */
 function getMinimalRange(data_obj, device, fullDuration) {
   var result = [];
-  var _timeRange = Math.abs(fullDuration.end - fullDuration.start); // 14
+  var _timeRange = fullDuration.end - fullDuration.start;
+  if (_timeRange < 0)
+    _timeRange = MAX_HOURS - fullDuration.start + fullDuration.end;
   if (device.duration > _timeRange) {
     throw new Error('Размер цикла больше чем доступный период работы');
   }
-  var arrCount = [];
+  var arrCount = [
+    // {
+    //     timeRange: _timeRange,
+    //     duration: device.duration,
+    //     start: fullDuration.start,
+    //     total: fullDuration.start + _timeRange - device.duration,
+    //     index: (fullDuration.start + 0) % MAX_HOURS
+    // }
+  ];
   for (
-    var i = fullDuration.start; // 7
-    i <= fullDuration.end - device.duration; //21 -3 = 18
-    i++ // 7, 8, ... 17
+    var i = fullDuration.start; // 21
+    i <= fullDuration.start + _timeRange - device.duration; //26
+    i++ // 21, 22, ... 26
   ) {
     var isAvailable = true;
     var temp_arr = [];
     var sum = 0;
+    var index = 0;
     for (
-      var j = 0;
-      j < device.duration;
-      j++ // 0, 1, 2
+      var dt = 0;
+      dt < device.duration;
+      dt++ // 0, 1, 2
     ) {
-      if (data_obj[i + j].power < device.power) {
+      index = (i + dt) % MAX_HOURS; // 21
+      if (data_obj[index].power < device.power) {
         isAvailable = false;
         break;
       }
-      sum += data_obj[i + j].tax;
-      temp_arr.push(i + j);
+      sum += parseInt(data_obj[index].tax * 100000);
+      temp_arr.push(index);
     } // узнали, подходит ли требуемый промежуток
     if (isAvailable) {
       arrCount.push({ sum: sum, time: temp_arr });
     }
   }
-  if (arrCount.length < 0) {
+  if (arrCount.length === 0) {
     throw new Error('Нет свободного времени в расписании');
   }
   // сортируем и возвращаем промежуток с минимальной общей стоимостью Ватта
-  return arrCount.sort((a, b) => a.sum - b.sum)[0].time;
+  return arrCount.sort((a, b) => {
+    if (a.sum < b.sum) {
+      return -1;
+    }
+    if (a.sum > b.sum) {
+      return 1;
+    }
+    if (a.sum === b.sum) {
+      if (device.mode === 'night') {
+        if (b.time[0] < a.time[0]) {
+          return -1;
+        } else {
+          return 1;
+        }
+      } else {
+        if (a.time[0] < b.time[0]) {
+          return -1;
+        } else {
+          return 1;
+        }
+      }
+    }
+  })[0].time;
 }
 fs.writeFileSync('2.js', `var k = ${JSON.stringify(Calculate(obj_1))}`);
 fs.writeFileSync(
@@ -109,8 +143,8 @@ fs.writeFileSync(
   `var k = ${JSON.stringify(
     getMinimalRange(
       Calculate(obj_1),
-      { power: 200, mode: 'day', duration: 6 },
-      { start: 21, end: 7 }
+      { power: 2000, mode: 'day', duration: 3 },
+      { start: 7, end: 21 }
     )
   )}`
 );

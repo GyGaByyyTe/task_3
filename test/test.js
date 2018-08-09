@@ -12,8 +12,10 @@ describe('Output', function() {
           '8': { power: 2100 },
           '9': { power: 2100 }
         },
-        7,
-        10,
+        {
+          start: 7,
+          end: 10
+        },
         6.46
       ),
       {
@@ -24,5 +26,7 @@ describe('Output', function() {
     );
   });
 });
-console.log(JSON.stringify(main.Calculate(obj_1)));
-fs.writeFileSync('hello.js', `var k = ${JSON.stringify(main.Calculate(obj_1))}`);
+fs.writeFileSync(
+  'result.js',
+  `var k = ${JSON.stringify(main.Calculate(obj_1))}`
+);
