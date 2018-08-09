@@ -32,7 +32,7 @@ function Calculate(data) {
     if (element.from === element.to) {
       Object.assign(
         hours,
-        setTax(hours, element.from, element.from + 1, element.value)
+        getWattCost(hours, element.from, element.from + 1, element.value)
       );
     } else if (element.from > element.to) {
       Object.assign(
@@ -66,35 +66,38 @@ function Calculate(data) {
     }
   }
 
-  //вписываем НЕкруглосуточные устройства по-одному
+  //вписываем НЕкруглосуточные устройства по-одному на ближайшие места
   var arr = {};
   partTime.forEach(device => {
-    arr = {};
+    arr = [];
     if (device.mode === 'day') {
-      for (var time in hours) {
-        if (parseInt(time) >= 7 && parseInt(time) < 21) {
-          if (hours[time].power >= device.power) {
-            arr[time] = hours[time];
-          }
-        }
-      }
+      // for (var time in hours) {
+      //   if (parseInt(time) >= 7 && parseInt(time) < 21) {
+      //     if (hours[time].power >= device.power) {
+      //       arr[time] = hours[time];
+      //     }
+      //   }
+      // }
+      getMinimalRange(hours, device, { start: 7, end: 21 });
     } else if (device.mode === 'night') {
-      for (var time in hours) {
-        if (
-          (parseInt(time) >= 21 && parseInt(time) < 24) ||
-          (parseInt(time) >= 0 && parseInt(time) < 7)
-        ) {
-          if (hours[time].power >= device.power) {
-            arr[time] = hours[time];
-          }
-        }
-      }
+      // for (var time in hours) {
+      //   if (
+      //     (parseInt(time) >= 21 && parseInt(time) < 24) ||
+      //     (parseInt(time) >= 0 && parseInt(time) < 7)
+      //   ) {
+      //     if (hours[time].power >= device.power) {
+      //       arr[time] = hours[time];
+      //     }
+      //   }
+      // }
+      getMinimalRange(hours, device, { start: 21, end: 7 });
     } else {
-      for (var time in hours) {
-        if (hours[time].power >= device.power) {
-          arr[time] = hours[time];
-        }
-      }
+      // for (var time in hours) {
+      //   if (hours[time].power >= device.power) {
+      //     arr[time] = hours[time];
+      //   }
+      // }
+      getMinimalRange(hours, device, { start: 0, end: 24 });
     }
     Object.assign(hours, fillHoursByDevice(arr, device));
   });
@@ -210,6 +213,46 @@ function fillHoursByDevice(obj_hours, obj_device) {
     } else break;
   }
   return result;
+}
+/** Получаем массив объектов из id НЕ круглосуточных устройств, и их мощностью в порядке возрастания мощности
+ * @param {Object} data_obj
+ * @param {Object} device
+ * @param {Object} fullDuration
+ * @returns {Array}
+ */
+
+function getMinimalRange(data_obj, device, fullDuration) {
+  var result = [];
+  var _timeRange = fullDuration.end - fullDuration.start;
+  if (device.duration > _timeRange) {
+    throw new Error('Размер цикла больше чем доступный период работы');
+  }
+  var arrCount = [];
+  for (
+    var i = fullDuration.start;
+    i <= fullDuration.end - device.duration;
+    i++
+  ) {
+    var isAvailable = true;
+    var temp_arr = [];
+    var sum = 0;
+    for (var j = 0; j < device.duration; j++) {
+      if (data_obj[i + j].power < device.power) {
+        isAvailable = false;
+        break;
+      }
+      sum += data_obj[i + j].tax;
+      temp_arr.push(i + j);
+    } // узнали, подходит ли требуемый промежуток
+    if (isAvailable) {
+      arrCount.push({ sum: sum, time: temp_arr });
+    }
+  }
+  if (arrCount.length < 0) {
+    throw new Error('Нет свободного времени в расписании');
+  }
+  // сортируем и возвращаем промежуток с минимальной общей стоимостью Ватта
+  return arrCount.sort((a, b) => a.sum - b.sum)[0].time;
 }
 
 module.exports.Calculate = Calculate;
