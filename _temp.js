@@ -1,11 +1,12 @@
 var fs = require('fs');
-var obj_1 = require('./test/const');
+var mockUp = require('./test/const');
+const main = require('./index.js');
 
 var MAX_HOURS = 24;
 var MIN_HOURS = 0;
 var WATT_IN_KW = 1000;
 
-function Calculate(data) {
+function CalculateHours(data) {
   var result = {};
 
   var maxPower = data.maxPower;
@@ -137,14 +138,21 @@ function getMinimalRange(data_obj, device, fullDuration) {
     }
   })[0].time;
 }
-fs.writeFileSync('2.js', `var k = ${JSON.stringify(Calculate(obj_1))}`);
-fs.writeFileSync(
-  '3.js',
-  `var k = ${JSON.stringify(
-    getMinimalRange(
-      Calculate(obj_1),
-      { power: 2000, mode: 'day', duration: 3 },
-      { start: 7, end: 21 }
-    )
-  )}`
-);
+// fs.writeFileSync(
+//   '2.js',
+//   `var k = ${JSON.stringify(CalculateHours(mockUp.testData1))}`
+// );
+// fs.writeFileSync(
+//   '3.js',
+//   `var k = ${JSON.stringify(
+//     main.getMinimalRange(
+//       CalculateHours(mockUp.testData1),
+//       { power: 1000, mode: 'night', duration: 6 },
+//       { start: 21, end: 7 }
+//     )
+//   )}`
+// );
+// fs.writeFileSync(
+//   'partTimeDevicesSorted.js',
+//   `var k = ${JSON.stringify(main.partTimeDevicesSorted(mockUp.testData1))}`
+// );

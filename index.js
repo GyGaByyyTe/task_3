@@ -2,21 +2,26 @@ var MAX_HOURS = 24;
 var MIN_HOURS = 0;
 var WATT_IN_KW = 1000;
 
-/**
- * @param {Object} data
- * @returns {Object}
+/** Основная функция, принимающая на вход данные о тарифах и устройствах
+ * и возвращающая расписание работы устройств, оптимизированное под минимальное
+ * потребление энергии
+ * @param {Object} data Объект с входными данными
+ * @returns {Object} График работы устройств
  */
 function Calculate(data) {
   var result = {};
 
   var maxPower = data.maxPower;
-  //вспомогательный объект с именами и мощностью устройств
-  var _devicesNamePower = {}; // объект устройство: {имя,мощность}
+
+  /* Вспомогательный объект с именами и мощностью устройств распределенными
+   * по их идентификаторам */
+  var _devicesNamePower = {};
   data.devices.forEach(device => {
     _devicesNamePower[device.id] = { name: device.name, power: device.power };
   });
 
-  //var hours = [ 0, 1, 2, 3, ...]
+  /* Начинаем формировать расписание 
+   * var hours = [ 0, 1, 2, 3, ...] */
   var hours = [...Array(MAX_HOURS).keys()];
 
   /* hours = {
@@ -27,7 +32,7 @@ function Calculate(data) {
     return acc;
   }, {});
 
-  /* Получаем объект с полями =>  'час': { power: Доступная_мощность , tax: Стоимость_одного_Ватта }, ... */
+  /* Добавляем в объект каждого часа поле - стоимость одного Ватта */
   data.rates.forEach(element => {
     if (element.from === element.to) {
       Object.assign(
@@ -69,17 +74,19 @@ function Calculate(data) {
   /* Получаем массив НЕ круглосуточных устройств */
   var partTime = partTimeDevicesSorted(data);
 
-  /* Заполняем каждый час круглосуточными устройствами, уменьшаем доступную мощность часа */
+  /* Заполняем каждый час круглосуточными устройствами, 
+   * уменьшаем доступную мощность часа */
   for (const time in hours) {
-    if (hours[time].power >= fullTime.power) {
+    if (hours[time].power >= fullTime.totalPower) {
       hours[time].devices = hours[time].devices.concat(fullTime.list);
-      hours[time].power -= fullTime.power;
+      hours[time].power -= fullTime.totalPower;
     } else {
       throw new Error('Power of set of devices much more than maximum');
     }
   }
 
-  //вписываем НЕкруглосуточные устройства по-одному на ближайшие места
+  /* вписываем НЕкруглосуточные устройства на ближайший диапазон времени,
+   * соответствующий циклу устройства */
   var arr = {};
   partTime.forEach(device => {
     arr = [];
@@ -100,6 +107,8 @@ function Calculate(data) {
   /* потребленная по факту энергия */
   var consumedEnergy = totalEnergy(hours, _devicesNamePower);
 
+  /* Формируем результирующий объект из расписания
+   * и данных по потребленной энергии */
   result = {
     ...result,
     schedule: hours,
@@ -155,12 +164,12 @@ function totalEnergy(data_obj, obj_devices) {
  * @returns {Object}
  */
 function fullTimeDevices(data) {
-  var fullTime = { list: [], power: 0 };
+  var fullTime = { list: [], totalPower: 0 };
   data.devices.forEach(device => {
     if (device.power <= data.maxPower) {
       if (device.duration === MAX_HOURS) {
         fullTime.list.push(device.id);
-        fullTime.power += device.power;
+        fullTime.totalPower += device.power;
       }
     } else {
       throw new Error('Мощность устройства больше доступной в час');
@@ -222,7 +231,10 @@ function getMinimalRange(obj_data, obj_device, fullDuration) {
   if (_timeRange < 0)
     _timeRange = MAX_HOURS - fullDuration.start + fullDuration.end;
   if (obj_device.duration > _timeRange) {
-    throw new Error('Размер цикла больше чем доступный период работы');
+    throw new Error(
+      'Размер цикла больше чем доступный период работы устройства ' +
+        obj_device.name
+    );
   }
   var arrCount = [];
   for (
@@ -248,7 +260,9 @@ function getMinimalRange(obj_data, obj_device, fullDuration) {
     }
   }
   if (arrCount.length === 0) {
-    throw new Error('Нет свободного времени в расписании');
+    throw new Error(
+      'Нет свободного времени в расписании для устройства ' + obj_device.name
+    );
   }
   // сортируем и возвращаем промежуток с минимальной общей стоимостью Ватта, при равных суммах - где час раньше
   return arrCount.sort((a, b) => {
@@ -278,3 +292,6 @@ function getMinimalRange(obj_data, obj_device, fullDuration) {
 
 module.exports.Calculate = Calculate;
 module.exports.getWattCost = getWattCost;
+module.exports.fullTimeDevices = fullTimeDevices;
+module.exports.partTimeDevicesSorted = partTimeDevicesSorted;
+module.exports.getMinimalRange = getMinimalRange;
